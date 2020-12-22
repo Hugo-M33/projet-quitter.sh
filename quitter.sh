@@ -16,7 +16,7 @@
 #    \|___| \__\|_______|\|__|    \|__|      \|__|  \|_______|\|__|\|__\|__|\_________\|__|\|__|
 #          \|__|                                                           \|_________|
 
-while reveille 
-do
-  coder()
-done
+
+CONFIG_DIR="~/.config/quitter"
+HORAIRES_FILE="horaires.db"
+PID_FILE="boucle.pid"
