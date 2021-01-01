@@ -21,28 +21,75 @@ set -e
 CONFIG_DIR="${HOME}/.config/quitter"
 HORAIRES_FILE="horaires.db"
 PID_FILE="boucle.pid"
+BOUCLE_PID=$(touch "$CONFIG_DIR"/${PID_FILE} && cat ${CONFIG_DIR}/${PID_FILE})
 DATE_PRESENT=$(date +%Y%m%d)
+
+function affiche_aide() {
+  echo -e "Quitter est un outil de gestion d'emploi du temps, permettant d'ajouter des rendez-vous\net d'être prévenu 5 minutes avant ainsi qu'à l'heure et la date spécifiée"
+  echo ""
+  echo "Utilisation : quitter [[HHMM] | [JJ-MM-AAAA_HHMM] Message [+tag1 +tag2]]"
+  echo "                      [-a [+tags] [JJ-MM-AAAA_HHMM]] [-l [+tags] [JJ-MM-AAAA_HHMM]]" 
+  echo "                      [-r [+tags] [JJ-MM-AAAA_HHMM]] [-q] [-h]"
+  echo ""
+  echo "  ----- Liste des options -----  "
+  printf "%-30s" "-a +tags JJ-MM-AAAA_HHMM"; echo "Liste TOUS les rdv avec au moins un des tags et horaires précisés"
+  printf "%-30s" "-l +tags JJ-MM-AAAA_HHMM"; echo "Liste les rdv à venir avec au moins un des tags et horaires précisés"
+  printf "%-30s" "-r +tags JJ-MM-AAAA_HHMM"; echo "supprime les rdv à venir avec au moins un des tags et horaires précisés"
+  printf "%-30s" "-q"; echo "stop la boucle, et ainsi les notifications des rendez-vous à venir"
+  printf "%-30s" "-h"; echo "Affiche l'aide"
+}
+
+function arreter_boucle() {
+  if [[ $BOUCLE_PID -ne -1 ]]
+  then
+    echo "-1">"${CONFIG_DIR}"/${PID_FILE}
+    echo "Arrêt de la boucle dans moins d'une minute..."
+  else
+    echo "Aucune boucle en cours, lancer la boucle ? [O]ui / [N]on"
+    read reponse
+    case $reponse in
+    o | O | OUI | oui | Oui)
+      lancer_boucle &
+      return 0
+      ;;
+    n | non | N | NON | Non)
+      return 0
+      ;;
+    *)
+      "Réponse non reconnue"
+      return 1
+    esac
+  fi
+}
 
 function alterter_rdv() {
         marqueur_present=$(date +%Y%m%d_%H%M)
         while read ligne
         do
         marqueur_temps=$(echo $ligne | cut -d'|' -f 1)
-        if [ "${marqueur_temps:0:8}" -eq "${marqueur_present:0:8}" ] && [ "${marqueur_temps:9:4}" -eq "${marqueur_present:9:4}" ]
+        date=${marqueur_temps:0:8}
+        temps=${marqueur_temps:9:4}
+        let temps_prevenir=$temps-5
+        if [ $date -eq "${marqueur_present:0:8}" ] && [ $temps -eq "${marqueur_present:9:4}" ]
         then
           echo "ALERTE $(echo $ligne | cut -d'|' -f 2)"
+          echo -e "\a"
+        elif [ $date -eq "${marqueur_present:0:8}" ] && [ $temps_prevenir -eq ${marqueur_present:9:4} ]
+        then
+          echo "ATTENTION : \"$(echo $ligne | cut -d'|' -f 2)\" dans 5 minutes"
+          echo -e "\a"
         fi
         done <"${CONFIG_DIR}"/${HORAIRES_FILE}
 }
 
 function boucle() {
-  echo "$$">"$1"
-  while [[ $(head -n 1 "$1") -eq $$ ]]
+  echo "$BASHPID">"$1"
+  while [[ $(head -n 1 "$1") -eq $BASHPID ]]
   do
-    echo "tour de boucle..." >&2
     alterter_rdv
-    sleep 30
+    sleep 60
   done
+  echo "Boucle arrêtée ! (ID : $BASHPID)"
 }
 
 function lancer_boucle() {
@@ -50,7 +97,7 @@ function lancer_boucle() {
   if [[ -f "$CONFIG_DIR"/"$PID_FILE" ]]
   then
     pid=$(cat "$fichier_boucle")
-    if ps -p $pid > /dev/null
+    if ps -p $pid > /dev/null 2> /dev/null
     then
       return 1
     else
@@ -59,7 +106,7 @@ function lancer_boucle() {
       return 0
     fi
   else
-    touch "$fichier_boucle"
+    touch "$fichier_boucle" && echo -1>"$fichier_boucle"
     lancer_boucle
   fi
     
@@ -109,7 +156,7 @@ function deserialiser_date() {
     mois="Décembre"
     ;;
   esac
-  echo "${date:6:2} ${mois} ${date:0:4}  "
+  echo "${date:6:2} ${mois} ${date:0:4}"
 }
 
 function serialiser_temps() {
@@ -248,20 +295,20 @@ function supprimer_rdv() {
 ##################################################################
 function trouver_mode() {
   case "$1" in
-  -q)
-    echo "TODO fonction arreter boucle"
+  -q | --quit)
+    arreter_boucle
     ;;
-  -l)
+  -l | --list)
     lister_prochain_rdv
     ;;
-  -a)
+  -a | --all)
     lister_rdv
     ;;
-  -r)
+  -r | --remove)
     supprimer_rdv "$@"
     ;;
-  -h)
-    echo "TODO afficher aide"
+  -h | --help)
+    affiche_aide
     ;;
   [0-2][0-9][0-6][0-9] | [0-3][0-9]-[0-1][0-9]-[0-9][0-9][0-9][0-9]_[0-2][0-9][0-6][0-9])
     ajouter_rdv "$@"
