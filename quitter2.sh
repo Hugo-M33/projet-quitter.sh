@@ -39,7 +39,7 @@ F_PID="boucle.pid"
 PATH_HORAIRES="$D_CONFIG/$F_HORAIRES"
 PATH_PID="$D_CONFIG/$F_PID"
 
-function affiche_aide() {
+function afficher_aide() {
     echo ""
     echo ' ________  ___  ___  ___  _________  _________  _______   ________      ________  ___  ___ '
     echo '|\   __  \|\  \|\  \|\  \|\___   ___\\___   ___\\  ___ \ |\   __  \    |\   ____\|\  \|\  \ '
@@ -71,10 +71,9 @@ function affiche_aide() {
 
 # Lance le processus qui alerte des rendez-vous, sauf si celui-ci est déjà en train de tourner
 function lancer_boucle() {
-    if test -f $PATH_PID; then
-        pid=$(cat $PATH_PID)
+    if test -f "$PATH_PID"; then
+        pid=$(cat "$PATH_PID")
         if ps -p $pid >/dev/null 2>/dev/null; then
-            echo "process running" >&2
             return 1
         else
             echo "lancement..." >&2
@@ -82,7 +81,7 @@ function lancer_boucle() {
             return 0
         fi
     else
-        touch $PATH_PID && echo "-1" >$PATH_PID
+        touch "$PATH_PID" && echo -n "-1" >"$PATH_PID"
         lancer_boucle
     fi
 }
@@ -90,8 +89,8 @@ function lancer_boucle() {
 # Si l'id du processus est le même, appelle la fonction alerter_rdv et attend la prochaine minute
 # Sinon arrête le processus
 function boucle() {
-    echo "$BASHPID" >$PATH_PID
-    while [[ $(head -n 1 $PATH_PID) -eq $BASHPID ]]; do
+    echo "$BASHPID" >"$PATH_PID"
+    while [[ $(cat "$PATH_PID") -eq "$BASHPID" ]]; do
         alerter_rdv
         sleep 60
     done
@@ -107,7 +106,7 @@ function alerter_rdv() {
             deserialiser_ligne $ligne
             jouer_son_alerter &
         fi
-    done <$PATH_HORAIRES
+    done <"$PATH_HORAIRES"
 }
 
 # Joue un petit son d'alerte
@@ -121,13 +120,13 @@ function jouer_son_alerte() {
     echo -e $BIP
     sleep 0.2
     echo -e $BIP
-
 }
 
 # Stop la boucle en effaçant le PID dans boucle.pid
 function arreter_boucle() {
-    if test $BOUCLE_PID -ne -1; then
-        echo -n "-1" >"${CONFIG_DIR}"/${PID_FILE}
+    BOUCLE_PID=$(cat "$PATH_PID")
+    if test $BOUCLE_PID -ne "-1"; then
+        echo -n "-1" >"$PATH_PID"
         echo "Arrêt de la boucle dans moins d'une minute..."
     else
         echo "Aucune boucle en cours, lancer la boucle ? [O]ui / [N]on"
@@ -319,7 +318,7 @@ function lister_prochain_rdv() {
 # Regarde le premier paramètre et lance la fonction correspondante
 function main() {
     case "$1" in
-    [0-9][0-9][0-9][0-9] | [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+    [0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
         horaire=$(ajuster_date $1)
         valider_date $horaire && valider_heures $horaire && valider_minutes $horaire || (
             echo "Erreur : Horaire inexistant"
@@ -335,7 +334,7 @@ function main() {
             exit 1
         fi
         ;;
-    -r | --remove)
+    -r|--remove)
         shift
         if test $# -ge 1; then
             supprimer_rdv $@
@@ -352,17 +351,20 @@ function main() {
             esac
         fi
         ;;
-    -a | --all)
+    -a|--all)
         shift
         lister_tout_rdv $@
         ;;
-    -l | --list)
+    -l|--list)
         shift
         lister_prochain_rdv $@
         ;;
-    -h | --help)
+    -h|--help)
         afficher_aide
         exit 0
+        ;;
+    -q|--quit)
+        arreter_boucle
         ;;
     *)
         echo "Erreur : option non reconnue"
@@ -373,9 +375,9 @@ function main() {
 # Vérifie que les dossiers et fichiers de config
 # existent, sinon les créé.
 function verifier_fichiers() {
-    test -d $D_CONFIG || mkdir -p $D_CONFIG
-    test -f $PATH_HORAIRES || touch $PATH_HORAIRES
-    test -f $PATH_PID || touch $PATH_PID && echo -n "-1" >$PATH_PID
+    test -d "$D_CONFIG" || mkdir -p "$D_CONFIG"
+    test -f "$PATH_HORAIRES" || touch "$PATH_HORAIRES"
+    test -f "$PATH_PID" || (touch "$PATH_PID" && echo -n "-1" >"$PATH_PID")
 }
 
 # Vérifie que la commande reçoit au moins 1 paramètre
@@ -383,5 +385,6 @@ if test $# -ge 1; then
     verifier_fichiers
     main $@
 else
-    echo "Erreur : Pas d'option, voir l'aide avec quitter -h | --help"
+    echo "Erreur : Pas d'option, voir l'aide"
+    afficher_aide
 fi
