@@ -50,7 +50,7 @@ function affiche_aide() {
 }
 
 function arreter_boucle() {
-  if [[ $BOUCLE_PID -ne -1 ]]
+  if test $BOUCLE_PID -ne -1
   then
     echo "-1">"${CONFIG_DIR}"/${PID_FILE}
     echo "Arrêt de la boucle dans moins d'une minute..."
@@ -95,11 +95,11 @@ function alterter_rdv() {
         date=${marqueur_temps:0:8}
         temps=${marqueur_temps:9:4}
         let temps_prevenir=$temps-5
-        if [[ $date -eq "${marqueur_present:0:8}" ]] && [[ $temps -eq "${marqueur_present:9:4}" ]]
+        if test $date -eq "${marqueur_present:0:8}" -a $temps -eq "${marqueur_present:9:4}" 
         then
           echo "ALERTE $(echo $ligne | cut -d'|' -f 2)"
           echo -e "\a"
-        elif [[ $date -eq "${marqueur_present:0:8}" ]] && [[ $temps_prevenir -eq ${marqueur_present:9:4} ]]
+        elif test $date -eq "${marqueur_present:0:8}" -a $temps_prevenir -eq ${marqueur_present:9:4}
         then
           echo "ATTENTION : \"$(echo $ligne | cut -d'|' -f 2)\" dans 5 minutes"
           echo -e "\a"
