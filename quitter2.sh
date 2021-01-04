@@ -100,11 +100,13 @@ function boucle() {
 # Teste si l'horaire de chaque rendez-vous est égale à l'horaire courrante
 # Si oui, alerte d'un rendez-vous et joue un son
 function alerter_rdv() {
+    
     while read ligne; do
+        horaire_present=$(date +%Y%m%d%H%M)
         horaire=$(echo $ligne | cut -d"$SEPARATEUR" -f 1)
-        if test $horaire -eq $HORAIRE_PRESENT; then
-            deserialiser_ligne $ligne
-            jouer_son_alerter &
+        if test $horaire -eq $horaire_present; then
+            xmessage "$(deserialiser_ligne "$ligne")"
+            jouer_son_alerte >&1
         fi
     done <"$PATH_HORAIRES"
 }
